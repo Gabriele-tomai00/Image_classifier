@@ -1,84 +1,130 @@
-import numpy as np
+
+
+#librerie
 import os
+from PIL import Image
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
+from sklearn import metrics
+import random as rd
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import silhouette_score
+#from yellowbrick.cluster import SilhouetteVisualizer
+import carico_immagini as ci
+import visual_vocabolary as vv
+import classificazioni as clf
 
-from sklearn.preprocessing import LabelEncoder
+#carico immagini training
+cartella_train = '/home/eva/Scrivania/esame_cv/train' 
+images_training, train_labels  = ci.carica_immagini_e_etichette(cartella_train)
+labels = np.unique(np.array(train_labels)) # nomi classi
 
-from extract_sift import load_images, load_images_from_folder, extract_sift_descriptors
-from neighbor_classification import build_confusion_matrix
-from sift_clustering import kmeans_clustering
-from visual_histogram import compute_visual_histogram, load_histograms
+#carico immagini test
+cartella_test = '/home/eva/Scrivania/esame_cv/test' 
+images_test, test_labels  = ci.carica_immagini_e_etichette(cartella_test)
 
+'''
+punto 1 
 
-def create_data_folder():
-    if not os.path.exists('data'):
-        os.makedirs('data')
+build a visual vocabulary:
+*   sample many (10K to 100K) SIFT descriptors from the images of
+the training set (you either use a detector or sample on a grid in the
+scale-space);
+*  cluster them using k-means (the choice of the number of clusters is
+up to you, and you should experiment with different values, but you
+could start with a few dozens);
+*  collect (and save for future use) the clusters’ centroids which repre-
+sent the k 128-dimensional visual words.
 
-def save_centroids(centroids, filepath):
-    np.save(filepath, centroids)
-    print(f"Centroids saved to {filepath}")
+'''
 
-def save_descriptors(desc, idx):
-    filename = os.path.join(output_file_descriptors, f"descriptors_img_{idx}.npy")
-    np.save(filename, desc)
-    print(f"Descriptors of the image {idx} saved in {filename}")
+#calcolo i descrittori dei key-points
+all_descriptors = vv.find_descriptors(100, images_training) 
+all_descriptors = np.vstack(all_descriptors)
+print(np.shape(all_descriptors))
 
-n_samples = 10000
-image_folder = "images/train/Bedroom"
-output_file_centroids = "data/centroids.npy"
-output_file_descriptors = "data/descriptors"
-output_file_histograms_of_train = "data/histograms_of_train.npy"
-output_file_histograms_of_test = "data/histograms_of_test.npy"
-
-def main():
-    create_data_folder()
-
-    train_folder = 'images/train'
-    test_folder = 'images/test'
-    # all images and relative labels
-    train_images, train_labels = load_images_from_folder(train_folder)
-    test_images, test_labels = load_images_from_folder(test_folder)
-
-    # SIFT DESCRIPTORS
-    train_images = load_images("images/train/Bedroom")
-    descriptors = extract_sift_descriptors(train_images)
-
-    # CLUSTERING
-    n_clusters = 50
-    centroids, labels = kmeans_clustering(descriptors, n_clusters)
-    print(f"Number of clusters: {n_clusters}")
-    print(f"Shape of cluster centroids: {centroids.shape}")
-
-
-    # HISTOGRAM: ho salvato solo gli istogrammi, sanza associarli a niente (labels), è giusto?
-    save_centroids(centroids, output_file_centroids)
-    train_histograms = compute_visual_histogram(train_images, centroids, output_file_histograms_of_train)
-    histograms_train = load_histograms(output_file_histograms_of_train)
-    train_histograms_array = np.array(train_histograms)
-
-    # POINT 3
-    # compute the normalized histogram for the test image to be classified (ma con i centroidi dei test o dei train?)
-    train_histograms_test = compute_visual_histogram(test_images, centroids, output_file_histograms_of_test)
-    histograms_test = load_histograms(output_file_histograms_of_test)
-    train_histograms_test_array = np.array(train_histograms_test)
-
-    # assign to the image the class corresponding to the training image having the closest histogram
-
-    # ENCODING set
-    encoder = LabelEncoder()
-    encoded_train_labels = encoder.fit_transform(train_labels)
-    encoded_test_labels = encoder.transform(test_labels)
-    print(f"len of encoded_train_labels: {len(encoded_train_labels)}") # 1500
-    print(f"encoded_train_labels: {encoded_train_labels}")
-    print(f"len of encoded_test_labels: {len(encoded_test_labels)}") # 2985
-    print(f"encoded_test_labels: {encoded_test_labels}")
+#ottengo le visual words ---  da fare tuning 
+k = 24
+visual_words = vv.centroids(all_descriptors,k)
+print(np.shape(visual_words))
 
 
-    # Creare la matrice di confusione
-    # cm = build_confusion_matrix(test_images, train_histograms_array, train_histograms_test_array, train_labels, test_labels)
+''' 
+punto 2 
+Represent each image of the training set as a normalized histogram having
+k bins, each corresponding to a visual word; a possibility is to perform a
+rather dense sampling in space and scale; another possibility is to use the
+SIFT detector to find the points in scale-space where the descriptor is
+computed. In any case, each computed descriptor will increase the value
+of the bin corresponding to the closest visual word.
+'''
+#istrogrammi training
+training_hist = compute_histograms(images_training)
 
-    # print("Confusion Matrix:")
-    # print(cm)
+'''
+punto 3
+Employ a nearest neighbor classifier and evaluate its performance:
+• compute the normalized histogram for the test image to be classified;
+• assign to the image the class corresponding to the training image
+having the closest histogram.
+• repeat for all the test images and build a confusion matrix.
+'''
+
+#istrogrammi test
+test_hist = compute_histograms(images_test)
+
+#classificazione istogrammi
+predict_labels = clf.test_assign_vv(training_hist, test_hist)
+#converto in text 
+predict_labels = [labels[prediction] for prediction in predict_labels]
+
+#confusion matrix
+cm = metrics.confusion_matrix(test_labels, predicted_labels)
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.unique(test_labels + predicted_labels))
+cm_display.plot()
+im = cm_display.im_
+im.set_cmap('YlGnBu')
+plt.show()
 
 
-if __name__ == "__main__":
-    main()
+'''
+punto 4
+Train a multiclass linear Support Vector Machine, using the one-vs-rest
+approach (you will need to train 15 binary classifiers having the normalized
+histograms as the input vectors and positive labels for the “one” class and
+negative for the “rest.”)
+'''
+training_hist = np.array(training_hist)
+classifier_svm = clf.one_vs_all_svm_train(training_hist, train_labels)
+
+'''
+punto 5 
+Evaluate the multiclass SVM:
+• compute the normalized histogram for the test image to be classified;
+• compute the real-valued output of each of the SVMs, using that his-
+togram as input;
+• assign to the image the class corresponding to the SVM having the
+greatest real-valued output.
+• repeat for all the test images and build a confusion matrix.
+'''
+#calcolati al punto 3
+test_hist = np.array(test_hist) 
+
+#classificazione test images
+test_svm_pred = clf.one_vs_all_svm_test(classifier_svm, test_hist)
+
+#converto in text per semplicità di lettura
+test_svm_pred = [labels[prediction] for prediction in test_svm_pred]
+
+#cnfusion matrix
+cm = metrics.confusion_matrix(test_labels, predicted_labels)
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.unique(test_labels + predicted_labels))
+cm_display.plot()
+im = cm_display.im_
+im.set_cmap('YlGnBu')
+plt.show()
+
