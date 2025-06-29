@@ -17,4 +17,17 @@
 3. Install dependencies:
     ```bash
     pip install -r requirements.txt
+4. Edit the folder path (optional)
+Keep in mind that you may have to edit the paths in which the training and test images are present
+    ```bash
+    drive.mount('/content/drive/', force_remount=True)
+    # Upload image training
+    folder_training = '/content/drive/MyDrive/CV_progetto2/train'
+    images_training, train_labels  = load_images_labels(folder_training)
 
+    # Loading test images
+    folder_test = '/content/drive/MyDrive/CV_progetto2/test'
+    images_test, test_labels  = load_images_labels(folder_test)
+### Final note
+Please keep in mind that we have worked on Colab so to avoid having to edit some paths and packages, we suggest viewing the work from Colab
+Thank you
