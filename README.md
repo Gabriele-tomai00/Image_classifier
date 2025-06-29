@@ -18,7 +18,7 @@
     ```bash
     pip install -r requirements.txt
 4. Edit the folder path (optional)
-Keep in mind that you may have to edit the paths in which the training and test images are present
+Keep in mind that you may have to edit the paths in which the training and test images are present (It is for Colab, but you have the images in this repo, in `/images` folder)
     ```bash
     drive.mount('/content/drive/', force_remount=True)
     # Upload image training
