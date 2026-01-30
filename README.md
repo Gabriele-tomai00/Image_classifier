@@ -1,4 +1,4 @@
-# Image_classifier
+# Image classifier
 
 
 ## Installation and Setup
