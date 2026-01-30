@@ -29,5 +29,4 @@ Keep in mind that you may have to edit the paths in which the training and test 
     folder_test = '/content/drive/MyDrive/CV_progetto2/test'
     images_test, test_labels  = load_images_labels(folder_test)
 ### Final note
-Please keep in mind that we have worked on Colab so to avoid having to edit some paths and packages, we suggest viewing the work from Colab
-Thank you
+Please keep in mind that we have worked on Colab so to avoid having to edit some paths and packages, we suggest viewing the work from Colab.
